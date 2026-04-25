@@ -1,42 +1,64 @@
-import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, View, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import IntroSplashScreen from './screens/IntroSplashScreen';
+import WelcomeScreen from './screens/WelcomeScreen';
 
 export default function App() {
-  const [showSplash, setShowSplash] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
 
-  const handleSplashFinish = () => {
-    // This is where you would normally navigate to Home or Login
-    // For now, we will keep it simple as requested.
-    console.log("Animation Finished");
-    // setShowSplash(false); 
+  // Two independent opacity anims — cross-fade without unmounting
+  const introOpacity = useRef(new Animated.Value(1)).current;
+  const welcomeOpacity = useRef(new Animated.Value(0)).current;
+
+  const handleFinishIntro = () => {
+    // Mount WelcomeScreen first (already mounted but invisible),
+    // then cross-fade so Android never sees a blank frame
+    setShowWelcome(true);
+
+    Animated.sequence([
+      // Small delay to let WelcomeScreen finish its first paint
+      Animated.delay(50),
+      Animated.parallel([
+        Animated.timing(introOpacity, {
+          toValue: 0,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+        Animated.timing(welcomeOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
   };
 
   return (
+    <SafeAreaProvider>
     <View style={styles.container}>
-      <StatusBar style="light" />
-      {showSplash ? (
-        <IntroSplashScreen onFinish={handleSplashFinish} />
-      ) : (
-        /* This part is hidden until showSplash is false */
-        <View style={styles.mainApp}>
-          {/* Main App Content Goes Here */}
-        </View>
+      <StatusBar style="dark" />
+
+      {/* WelcomeScreen sits below — rendered early so no paint lag */}
+      {showWelcome && (
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: welcomeOpacity }]}>
+          <WelcomeScreen />
+        </Animated.View>
       )}
+
+      {/* IntroSplashScreen fades out on top */}
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: introOpacity }]}>
+        <IntroSplashScreen onFinish={handleFinishIntro} />
+      </Animated.View>
     </View>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#ffffff',
   },
-  mainApp: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  }
 });
