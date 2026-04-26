@@ -1,64 +1,113 @@
 import React, { useState, useRef } from 'react';
-import { StyleSheet, View, Animated } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Animated,
+  Dimensions,
+  Platform,
+  UIManager,
+} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import IntroSplashScreen from './screens/IntroSplashScreen';
 import WelcomeScreen from './screens/WelcomeScreen';
+import SetupScreen from './screens/SetupScreen';
+import HomeScreen from './screens/HomeScreen';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const { width: SCREEN_W } = Dimensions.get('window');
+const DURATION = 350;
+
+const SCREEN_ORDER = ['intro', 'welcome', 'setup', 'home'];
 
 export default function App() {
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [screenStack, setScreenStack] = useState(['intro']);
+  const [userData, setUserData] = useState(null);
+  const isAnimating = useRef(false);
 
-  // Two independent opacity anims — cross-fade without unmounting
-  const introOpacity = useRef(new Animated.Value(1)).current;
-  const welcomeOpacity = useRef(new Animated.Value(0)).current;
+  // We keep ALL visited screens mounted but only show current + next
+  // translateX for each screen — keyed by name
+  const positions = useRef({
+    intro:   new Animated.Value(0),
+    welcome: new Animated.Value(SCREEN_W),
+    setup:   new Animated.Value(SCREEN_W),
+    home:    new Animated.Value(SCREEN_W),
+  }).current;
 
-  const handleFinishIntro = () => {
-    // Mount WelcomeScreen first (already mounted but invisible),
-    // then cross-fade so Android never sees a blank frame
-    setShowWelcome(true);
+  const navigate = (toScreen, data) => {
+    if (isAnimating.current) return;
+    isAnimating.current = true;
 
-    Animated.sequence([
-      // Small delay to let WelcomeScreen finish its first paint
-      Animated.delay(50),
+    if (data) setUserData(data);
+
+    const fromScreen = screenStack[screenStack.length - 1];
+
+    // Make sure destination is already at SCREEN_W (offscreen right)
+    positions[toScreen].setValue(SCREEN_W);
+
+    // Add to stack so it renders
+    setScreenStack(prev => [...prev, toScreen]);
+
+    // Wait 2 frames for Android to render the new screen before animating
+    const run = () => {
       Animated.parallel([
-        Animated.timing(introOpacity, {
+        Animated.timing(positions[fromScreen], {
+          toValue: -SCREEN_W * 0.3,
+          duration: DURATION,
+          useNativeDriver: true,
+        }),
+        Animated.timing(positions[toScreen], {
           toValue: 0,
-          duration: 450,
+          duration: DURATION,
           useNativeDriver: true,
         }),
-        Animated.timing(welcomeOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
+      ]).start(() => {
+        isAnimating.current = false;
+      });
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(run));
+  };
+
+  const screens = {
+    intro:   <IntroSplashScreen onFinish={() => navigate('welcome')} />,
+    welcome: <WelcomeScreen onGetStarted={() => navigate('setup')} />,
+    setup:   <SetupScreen onFinish={(d) => navigate('home', d)} />,
+    home:    <HomeScreen userData={userData} />,
   };
 
   return (
     <SafeAreaProvider>
-    <View style={styles.container}>
-      <StatusBar style="dark" />
-
-      {/* WelcomeScreen sits below — rendered early so no paint lag */}
-      {showWelcome && (
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: welcomeOpacity }]}>
-          <WelcomeScreen />
-        </Animated.View>
-      )}
-
-      {/* IntroSplashScreen fades out on top */}
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: introOpacity }]}>
-        <IntroSplashScreen onFinish={handleFinishIntro} />
-      </Animated.View>
-    </View>
+      <View style={styles.root}>
+        <StatusBar style="dark" />
+        {SCREEN_ORDER.map((name) => {
+          const inStack = screenStack.includes(name);
+          if (!inStack) return null;
+          return (
+            <Animated.View
+              key={name}
+              style={[
+                StyleSheet.absoluteFill,
+                { transform: [{ translateX: positions[name] }] },
+              ]}
+            >
+              {screens[name]}
+            </Animated.View>
+          );
+        })}
+      </View>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: '#ffffff',
+    overflow: 'hidden',
   },
 });

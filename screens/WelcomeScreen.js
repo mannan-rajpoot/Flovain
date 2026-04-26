@@ -22,7 +22,7 @@ const scale = (size) => (SCREEN_W / 390) * size;
 // Scale fonts with PixelRatio capping to avoid huge text on tablets
 const fs = (size) => {
   const scaled = scale(size);
-  const maxScale = 1.25; // cap at 125 % of base size
+  const maxScale = 1.25;
   return Math.min(scaled, size * maxScale);
 };
 
@@ -35,7 +35,13 @@ const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
 const BAR_DATA = [40, 70, 45, 90, 65, 80, 95];
 
-const WelcomeScreen = () => {
+/**
+ * WelcomeScreen
+ *
+ * Props:
+ *   onGetStarted — called when the user taps "Get Started"
+ */
+const WelcomeScreen = ({ onGetStarted }) => {
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(vs(30))).current;
@@ -87,7 +93,7 @@ const WelcomeScreen = () => {
         ]}
         showsVerticalScrollIndicator={false}
         bounces={false}
-        overScrollMode="never" // Android: removes grey overscroll glow
+        overScrollMode="never"
       >
         {/* HEADER */}
         <Animated.View style={[styles.header, { opacity: fadeAnim }]}>
@@ -162,7 +168,7 @@ const WelcomeScreen = () => {
             styles.primaryButton,
             { height: clamp(vs(60), 52, 68), borderRadius: scale(18) },
           ]}
-          onPress={() => console.log('Get Started')}
+          onPress={() => onGetStarted && onGetStarted()}
         >
           <Text style={[styles.buttonText, { fontSize: fs(17) }]}>
             Get Started
@@ -248,7 +254,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'rgba(255,255,255,0.97)',
-    // shadow
     ...Platform.select({
       ios: {
         shadowColor: '#000',
