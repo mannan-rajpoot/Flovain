@@ -7,9 +7,7 @@ import {
   Animated,
   Dimensions,
   TextInput,
-  ScrollView,
   Platform,
-  KeyboardAvoidingView,
   Keyboard,
   TouchableWithoutFeedback,
 } from 'react-native';
@@ -23,167 +21,228 @@ const vs    = (size) => (SCREEN_H / 844) * size;
 const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
 
 const GOALS = [
-  { id: 'discipline',    label: 'Build discipline',       icon: 'shield-checkmark-outline' },
-  { id: 'fitness',       label: 'Get fit',                icon: 'barbell-outline'          },
-  { id: 'study',         label: 'Study better',           icon: 'book-outline'             },
-  { id: 'productivity',  label: 'Improve productivity',   icon: 'flash-outline'            },
-  { id: 'lifestyle',     label: 'Improve lifestyle',      icon: 'leaf-outline'             },
-  { id: 'consistent',    label: 'Stay consistent',        icon: 'repeat-outline'           },
-  { id: 'procrastinate', label: 'Reduce procrastination', icon: 'timer-outline'            },
-  { id: 'mental',        label: 'Mental health',          icon: 'heart-outline'            },
-  { id: 'wakeup',        label: 'Wake up early',          icon: 'sunny-outline'            },
-  { id: 'skills',        label: 'Learn new skills',       icon: 'rocket-outline'           },
+  {
+    id: 'fitness',
+    label: 'Get Fit',
+    sub: 'Build a stronger, healthier body',
+    icon: 'barbell-outline',
+    iconFilled: 'barbell',
+    color: '#F43F5E',
+    bg: '#FFF1F2',
+  },
+  {
+    id: 'study',
+    label: 'Study Better',
+    sub: 'Focus deeper and retain more',
+    icon: 'book-outline',
+    iconFilled: 'book',
+    color: '#F59E0B',
+    bg: '#FFFBEB',
+  },
+  {
+    id: 'mental',
+    label: 'Mental Health',
+    sub: 'Reduce stress and build calm',
+    icon: 'heart-outline',
+    iconFilled: 'heart',
+    color: '#8B5CF6',
+    bg: '#F5F3FF',
+  },
+  {
+    id: 'discipline',
+    label: 'Build Discipline',
+    sub: 'Stay consistent and wake early',
+    icon: 'shield-checkmark-outline',
+    iconFilled: 'shield-checkmark',
+    color: '#6366F1',
+    bg: '#EEF2FF',
+  },
+  {
+    id: 'productivity',
+    label: 'Be More Productive',
+    sub: 'Stop procrastinating, do more',
+    icon: 'flash-outline',
+    iconFilled: 'flash',
+    color: '#10B981',
+    bg: '#ECFDF5',
+  },
 ];
 
-const SetupScreen = ({ onFinish }) => {
+// ── Goal card component ────────────────────────────────────────────────────
+const GoalCard = ({ goal, isSelected, onPress, animOpacity, animSlide }) => {
+  const pressScale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(pressScale, { toValue: 0.97, duration: 70, useNativeDriver: true }),
+      Animated.spring(pressScale, { toValue: 1, tension: 260, friction: 8, useNativeDriver: true }),
+    ]).start();
+    onPress();
+  };
+
+  return (
+    <Animated.View
+      style={{
+        opacity: animOpacity,
+        transform: [{ translateY: animSlide }, { scale: pressScale }],
+        flex: 1,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={handlePress}
+        style={[
+          styles.card,
+          isSelected && {
+            borderColor: goal.color,
+            borderWidth: 2,
+            backgroundColor: goal.bg,
+          },
+        ]}
+      >
+        {/* Icon bubble */}
+        <View style={[
+          styles.cardIconBubble,
+          { backgroundColor: isSelected ? goal.color : '#F3F4F6' },
+        ]}>
+          <Ionicons
+            name={isSelected ? goal.iconFilled : goal.icon}
+            size={scale(22)}
+            color={isSelected ? '#FFF' : '#999'}
+          />
+        </View>
+
+        {/* Text */}
+        <View style={styles.cardText}>
+          <Text
+            style={[
+              styles.cardLabel,
+              { fontSize: fs(15) },
+              isSelected && { color: goal.color },
+            ]}
+          >
+            {goal.label}
+          </Text>
+          <Text style={[styles.cardSub, { fontSize: fs(12) }]}>
+            {goal.sub}
+          </Text>
+        </View>
+
+        {/* Radio */}
+        <View style={[styles.radio, isSelected && { borderColor: goal.color }]}>
+          {isSelected && (
+            <View style={[styles.radioDot, { backgroundColor: goal.color }]} />
+          )}
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// ── Main ───────────────────────────────────────────────────────────────────
+export default function SetupScreen({ onFinish }) {
   const insets = useSafeAreaInsets();
-  const [username, setUsername]           = useState('');
-  const [selectedGoals, setSelectedGoals] = useState([]);
-  const [inputFocused, setInputFocused]   = useState(false);
+  const [username, setUsername]    = useState('');
+  const [selectedGoal, setGoal]    = useState(null);
+  const [inputFocused, setFocused] = useState(false);
   const inputRef = useRef(null);
 
-  // ── Animations ────────────────────────────────────────────────────────────
-  const headerAnim  = useRef(new Animated.Value(0)).current;
-  const headerSlide = useRef(new Animated.Value(vs(30))).current;
-  const footerAnim  = useRef(new Animated.Value(0)).current;
-  const cardFades   = useRef(GOALS.map(() => new Animated.Value(0))).current;
-  const cardSlides  = useRef(GOALS.map(() => new Animated.Value(scale(18)))).current;
+  // ── Animations — same pattern as WelcomeScreen ──────────────────────────
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideUp  = useRef(new Animated.Value(vs(30))).current;
+  const footerFade = useRef(new Animated.Value(0)).current;
+
+  // Per-card stagger: opacity + slide
+  const cardOpacities = useRef(GOALS.map(() => new Animated.Value(0))).current;
+  const cardSlides    = useRef(GOALS.map(() => new Animated.Value(vs(20)))).current;
 
   useEffect(() => {
+    // Header + input entrance — exact same as WelcomeScreen
     Animated.parallel([
-      Animated.timing(headerAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-      Animated.spring(headerSlide, { toValue: 0, tension: 22, friction: 9, useNativeDriver: true }),
-      Animated.timing(footerAnim, { toValue: 1, duration: 600, delay: 200, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.spring(slideUp,  { toValue: 0, tension: 22, friction: 9, useNativeDriver: true }),
+      Animated.timing(footerFade, { toValue: 1, duration: 600, delay: 300, useNativeDriver: true }),
     ]).start();
 
+    // Cards stagger in — same spring params as WelcomeScreen
     Animated.parallel(
       GOALS.map((_, i) =>
         Animated.parallel([
-          Animated.timing(cardFades[i], {
-            toValue: 1, duration: 380, delay: 300 + i * 50, useNativeDriver: true,
+          Animated.timing(cardOpacities[i], {
+            toValue: 1,
+            duration: 500,
+            delay: 350 + i * 70,
+            useNativeDriver: true,
           }),
           Animated.spring(cardSlides[i], {
-            toValue: 0, tension: 26, friction: 8, delay: 300 + i * 50, useNativeDriver: true,
+            toValue: 0,
+            tension: 22,
+            friction: 9,
+            delay: 350 + i * 70,
+            useNativeDriver: true,
           }),
         ])
       )
     ).start();
   }, []);
 
-  const toggleGoal = (id) =>
-    setSelectedGoals((prev) =>
-      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id]
-    );
-
-  const canContinue = username.trim().length > 0 && selectedGoals.length > 0;
+  const canContinue = username.trim().length > 0 && selectedGoal !== null;
 
   const handleContinue = () => {
     if (!canContinue) return;
     Keyboard.dismiss();
-    if (onFinish) onFinish({ username: username.trim(), goals: selectedGoals });
+    if (onFinish) onFinish({ username: username.trim(), goals: [selectedGoal] });
   };
 
   const footerH = clamp(vs(130), 110, 160) + insets.bottom;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      
-      {/* 
-         FIX 1: Added pointerEvents="none" 
-         This prevents the background circles from intercepting touch events 
-         that should go to the TextInput or Chips.
-      */}
-      <View 
-        pointerEvents="none"
-        style={[styles.bgCircle, {
-          width: scale(280), height: scale(280), borderRadius: scale(140),
-          top: -scale(140), right: -scale(80),
-        }]} 
-      />
-      <View 
-        pointerEvents="none"
-        style={[styles.bgCircleBottom, {
-          width: scale(200), height: scale(200), borderRadius: scale(100),
-          bottom: -scale(80), left: -scale(60),
-        }]} 
-      />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: footerH + vs(24) },
-          ]}
-          showsVerticalScrollIndicator={false}
-          bounces={Platform.OS === 'ios'}
-          // FIX 2: handled is correct, but we ensure the ScrollView doesn't 
-          // capture the touch before it hits the input.
-          keyboardShouldPersistTaps="always" 
-          keyboardDismissMode="on-drag"
-        >
+        {/* Background circle — same as WelcomeScreen */}
+        <View
+          pointerEvents="none"
+          style={[styles.bgCircle, {
+            width: scale(300), height: scale(300), borderRadius: scale(150),
+            top: -scale(150), right: -scale(100),
+          }]}
+        />
 
-          {/* ── STEP DOTS ── */}
-          <Animated.View style={[styles.header, {
-            opacity: headerAnim,
-            transform: [{ translateY: headerSlide }],
-          }]}>
-            <View style={styles.stepDots}>
-              <View style={[styles.dot, styles.dotDone]} />
-              <View style={[styles.dot, styles.dotActive]} />
-              <View style={[styles.dot, styles.dotIdle]} />
-            </View>
-          </Animated.View>
+        {/* ── MAIN CONTENT — flex layout, no scroll needed ── */}
+        <View style={[styles.content, { paddingBottom: footerH }]}>
 
-          {/* ── HERO TEXT ── */}
-          <Animated.View style={{
-            opacity: headerAnim,
-            transform: [{ translateY: headerSlide }],
-          }}>
+          {/* HERO */}
+          <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideUp }] }}>
             <Text style={[styles.kicker, { fontSize: fs(11) }]}>Almost there</Text>
-            <Text style={[styles.title, { fontSize: fs(36), lineHeight: fs(42) }]}>
-              Let's personalise{'\n'}your journey.
-            </Text>
-            <Text style={[styles.subtitle, { fontSize: fs(15), lineHeight: fs(24) }]}>
-              Tell us who you are and what you want to achieve.
+            <Text style={[styles.title, { fontSize: fs(34), lineHeight: fs(40) }]}>
+              Let’s build your best routine.
             </Text>
           </Animated.View>
 
-          {/* ── USERNAME INPUT ── */}
-          <View style={{ marginTop: vs(30) }}>
-            <Text style={[styles.fieldLabel, { fontSize: fs(12) }]}>YOUR NAME</Text>
-            
-            {/* 
-                FIX 3: Wrap input in a focusable area 
-                Sometimes on Android, clicking the icon or the wrapper doesn't 
-                trigger the inner TextInput focus correctly.
-            */}
+          {/* NAME INPUT */}
+          <Animated.View style={[styles.inputSection, { opacity: fadeAnim, transform: [{ translateY: slideUp }] }]}>
+            <Text style={[styles.fieldLabel, { fontSize: fs(11) }]}>YOUR NAME</Text>
             <TouchableWithoutFeedback onPress={() => inputRef.current?.focus()}>
-              <View style={[
-                styles.inputWrapper,
-                inputFocused && styles.inputWrapperFocused,
-              ]}>
-                <Ionicons
-                  name="person-outline"
-                  size={scale(18)}
-                  color={inputFocused ? '#8B5CF6' : '#C0C0C0'}
-                  style={{ marginRight: scale(10) }}
-                />
+              <View style={[styles.inputWrapper, inputFocused && styles.inputWrapperFocused]}>
+                <View style={[styles.inputIconBubble, inputFocused && styles.inputIconFocused]}>
+                  <Ionicons
+                    name={inputFocused ? 'person' : 'person-outline'}
+                    size={scale(15)}
+                    color={inputFocused ? '#8B5CF6' : '#AAA'}
+                  />
+                </View>
                 <TextInput
                   ref={inputRef}
-                  style={[styles.textInput, { fontSize: fs(16) }]}
+                  style={[styles.textInput, { fontSize: fs(15) }]}
                   placeholder="Enter your name"
-                  placeholderTextColor="#C0C0C0"
+                  placeholderTextColor="#C4C4C4"
                   value={username}
                   onChangeText={setUsername}
-                  onFocus={() => setInputFocused(true)}
-                  onBlur={() => setInputFocused(false)}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
                   returnKeyType="done"
-                  onSubmitEditing={() => Keyboard.dismiss()}
+                  onSubmitEditing={Keyboard.dismiss}
                   maxLength={24}
                   autoCorrect={false}
                   autoCapitalize="words"
@@ -191,186 +250,236 @@ const SetupScreen = ({ onFinish }) => {
                 />
                 {username.length > 0 && (
                   <TouchableOpacity
-                    onPress={() => {
-                      setUsername('');
-                      inputRef.current?.focus();
-                    }}
-                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                    onPress={() => { setUsername(''); inputRef.current?.focus(); }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   >
-                    <Ionicons name="close-circle" size={scale(18)} color="#C0C0C0" />
+                    <Ionicons name="close-circle" size={scale(18)} color="#D1D5DB" />
                   </TouchableOpacity>
                 )}
               </View>
             </TouchableWithoutFeedback>
-          </View>
+          </Animated.View>
 
-          {/* ── GOAL CHIPS ── */}
-          <View style={{ marginTop: vs(28) }}>
-            <Text style={[styles.fieldLabel, { fontSize: fs(12), marginBottom: vs(14) }]}>
-              YOUR GOALS
+          {/* GOAL QUESTION */}
+          <Animated.View style={[styles.goalSection, { opacity: fadeAnim, transform: [{ translateY: slideUp }] }]}>
+            <Text style={[styles.fieldLabel, { fontSize: fs(11), marginBottom: vs(10) }]}>
+              WHAT DO YOU WANT TO IMPROVE MOST?
             </Text>
-            <View style={styles.chipGrid}>
-              {GOALS.map((goal, i) => {
-                const isSelected = selectedGoals.includes(goal.id);
-                return (
-                  <Animated.View
-                    key={goal.id}
-                    style={{
-                      opacity: cardFades[i],
-                      transform: [{ translateX: cardSlides[i] }],
-                    }}
-                  >
-                    <TouchableOpacity
-                      activeOpacity={0.75}
-                      onPress={() => toggleGoal(goal.id)}
-                      style={[styles.chip, isSelected && styles.chipSelected]}
-                    >
-                      <Ionicons
-                        name={isSelected ? goal.icon.replace('-outline', '') : goal.icon}
-                        size={scale(14)}
-                        color={isSelected ? '#FFF' : '#666'}
-                      />
-                      <Text style={[
-                        styles.chipLabel,
-                        { fontSize: fs(13) },
-                        isSelected && styles.chipLabelSelected,
-                      ]}>
-                        {goal.label}
-                      </Text>
-                      {isSelected && (
-                        <View style={styles.chipCheck}>
-                          <Ionicons name="checkmark" size={scale(9)} color="#FFF" />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })}
-            </View>
+          </Animated.View>
+
+          {/* GOAL CARDS — flex column fills remaining space */}
+          <View style={styles.cardList}>
+            {GOALS.map((goal, i) => (
+              <GoalCard
+                key={goal.id}
+                goal={goal}
+                isSelected={selectedGoal === goal.id}
+                onPress={() => setGoal(goal.id)}
+                animOpacity={cardOpacities[i]}
+                animSlide={cardSlides[i]}
+              />
+            ))}
           </View>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </View>
 
-      {/* ── FIXED FOOTER ── */}
-      <Animated.View style={[styles.footer, {
-        opacity: footerAnim,
-        paddingBottom: insets.bottom > 0 ? insets.bottom : vs(32),
-        paddingHorizontal: scale(26),
-        paddingTop: vs(14),
-      }]}>
-        <TouchableOpacity
-          activeOpacity={canContinue ? 0.88 : 1}
-          style={[
-            styles.primaryButton,
-            { height: clamp(vs(60), 52, 68), borderRadius: scale(18) },
-            !canContinue && styles.primaryButtonDisabled,
-          ]}
-          onPress={handleContinue}
-        >
-          <Text style={[styles.buttonText, { fontSize: fs(17) }]}>
-            Continue
+        {/* FIXED FOOTER */}
+        <Animated.View style={[styles.footer, {
+          opacity: footerFade,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : vs(28),
+          paddingHorizontal: scale(26),
+          paddingTop: vs(14),
+        }]}>
+          <TouchableOpacity
+            activeOpacity={canContinue ? 0.88 : 1}
+            style={[
+              styles.primaryButton,
+              { height: clamp(vs(60), 52, 68), borderRadius: scale(18) },
+              !canContinue && styles.primaryButtonDisabled,
+            ]}
+            onPress={handleContinue}
+          >
+            <Text style={[
+              styles.buttonText,
+              { fontSize: fs(17) },
+              !canContinue && styles.buttonTextDisabled,
+            ]}>
+              Continue
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={scale(18)}
+              color={canContinue ? '#FFF' : '#C0C0C0'}
+              style={{ marginLeft: scale(8) }}
+            />
+          </TouchableOpacity>
+
+          <Text style={[styles.footerHint, { fontSize: fs(12), marginTop: vs(10) }]}>
+            {!selectedGoal
+              ? 'Pick your main focus to continue'
+              : !username.trim()
+              ? 'Enter your name to continue'
+              : `Let's go, ${username.trim().split(' ')[0]} 🚀`}
           </Text>
-          <Ionicons
-            name="arrow-forward"
-            size={scale(18)}
-            color={canContinue ? '#FFF' : '#BBB'}
-            style={{ marginLeft: scale(8) }}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.termsText, { fontSize: fs(12), marginTop: vs(14) }]}>
-          {selectedGoals.length > 0
-            ? `${selectedGoals.length} goal${selectedGoals.length > 1 ? 's' : ''} selected`
-            : 'Select at least one goal to continue'}
-        </Text>
-      </Animated.View>
+        </Animated.View>
 
-    </SafeAreaView>
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
-};
+}
 
+// ── Styles ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  bgCircle: { position: 'absolute', backgroundColor: '#F5F3FF', zIndex: -1 },
-  bgCircleBottom: { position: 'absolute', backgroundColor: '#F0FDF4', zIndex: -1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
 
-  header: { marginBottom: vs(24) },
-  stepDots: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
-  dot: { height: 6, borderRadius: 3 },
-  dotDone:   { width: scale(18), backgroundColor: '#8B5CF6', opacity: 0.4 },
-  dotActive: { width: scale(28), backgroundColor: '#8B5CF6' },
-  dotIdle:   { width: scale(18), backgroundColor: '#E5E7EB' },
+  bgCircle: {
+    position: 'absolute',
+    backgroundColor: '#F5F3FF',
+    zIndex: -1,
+  },
 
-  scrollContent: { paddingHorizontal: scale(28), paddingTop: vs(16) },
+  // Full-height flex column — everything fits on screen
+  content: {
+    flex: 1,
+    paddingHorizontal: scale(26),
+    paddingTop: vs(16),
+  },
 
   kicker: {
-    fontWeight: '800', color: '#8B5CF6',
-    textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: vs(10),
+    fontWeight: '800',
+    color: '#8B5CF6',
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+    marginBottom: vs(6),
   },
-  title: { fontWeight: '900', color: '#111', letterSpacing: -1.2 },
-  subtitle: { color: '#666', marginTop: vs(12), fontWeight: '400' },
+  title: {
+    fontWeight: '900',
+    color: '#111',
+    letterSpacing: -1.2,
+  },
 
+  // Input block
+  inputSection: {
+    marginTop: vs(20),
+  },
   fieldLabel: {
-    fontWeight: '800', color: '#999',
-    letterSpacing: 1.4, marginBottom: vs(10),
+    fontWeight: '800',
+    color: '#9CA3AF',
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    marginBottom: vs(8),
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
-    borderRadius: scale(16),
+    borderRadius: scale(14),
     backgroundColor: '#FAFAFA',
-    paddingHorizontal: scale(16),
-    height: clamp(vs(54), 50, 62),
+    paddingHorizontal: scale(14),
+    height: clamp(vs(52), 48, 58),
+    gap: scale(10),
   },
   inputWrapperFocused: {
     borderColor: '#8B5CF6',
     backgroundColor: '#FDFCFF',
     ...Platform.select({
       ios: {
-        shadowColor: '#8B5CF6', shadowOpacity: 0.15,
-        shadowRadius: 8, shadowOffset: { width: 0, height: 2 },
+        shadowColor: '#8B5CF6', shadowOpacity: 0.14,
+        shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
       },
       android: { elevation: 3 },
     }),
   },
+  inputIconBubble: {
+    width: scale(28), height: scale(28),
+    borderRadius: scale(8),
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  inputIconFocused: { backgroundColor: '#EDE9FE' },
   textInput: {
     flex: 1,
     color: '#111',
     fontWeight: '600',
-    // Removed specific padding/margin constraints that sometimes 
-    // shrink the tappable area on Android
-    height: '100%', 
+    height: '100%',
+    paddingVertical: 0,
   },
 
-  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: scale(10) },
-  chip: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: scale(13), paddingVertical: vs(10),
-    borderRadius: scale(50), borderWidth: 1.5,
-    borderColor: '#E5E7EB', backgroundColor: '#FAFAFA',
-    gap: scale(6),
+  goalSection: {
+    marginTop: vs(18),
   },
-  chipSelected: {
-    backgroundColor: '#111', borderColor: '#111',
+
+  // Cards fill all remaining vertical space evenly
+  cardList: {
+    flex: 1,
+    gap: scale(8),
+    paddingBottom: vs(4),
+  },
+
+  // Each card — height comes from flex:1 on parent
+  card: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: scale(14),
+    borderRadius: scale(16),
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FAFAFA',
+    gap: scale(12),
     ...Platform.select({
       ios: {
-        shadowColor: '#000', shadowOpacity: 0.14,
-        shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
+        shadowColor: '#000', shadowOpacity: 0.04,
+        shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
       },
-      android: { elevation: 4 },
+      android: { elevation: 1 },
     }),
   },
-  chipLabel: { fontWeight: '600', color: '#444', letterSpacing: -0.2 },
-  chipLabelSelected: { color: '#FFF' },
-  chipCheck: {
-    width: scale(16), height: scale(16), borderRadius: scale(8),
-    backgroundColor: '#8B5CF6', justifyContent: 'center', alignItems: 'center',
+
+  cardIconBubble: {
+    width: scale(42), height: scale(42),
+    borderRadius: scale(12),
+    justifyContent: 'center', alignItems: 'center',
+    flexShrink: 0,
   },
 
+  cardText: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  cardLabel: {
+    fontWeight: '800',
+    color: '#111',
+    letterSpacing: -0.3,
+    marginBottom: vs(1),
+  },
+  cardSub: {
+    color: '#AAA',
+    fontWeight: '500',
+    letterSpacing: -0.1,
+  },
+
+  radio: {
+    width: scale(20), height: scale(20),
+    borderRadius: scale(10),
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center', alignItems: 'center',
+    flexShrink: 0,
+  },
+  radioDot: {
+    width: scale(10), height: scale(10),
+    borderRadius: scale(5),
+  },
+
+  // Footer
   footer: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(255,255,255,0.97)',
     ...Platform.select({
       ios: {
@@ -385,12 +494,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  primaryButtonDisabled: {
-    backgroundColor: '#E5E7EB',
-  },
+  primaryButtonDisabled: { backgroundColor: '#E5E7EB' },
   buttonText: { color: '#FFF', fontWeight: '700', letterSpacing: -0.3 },
-  termsText: { textAlign: 'center', color: '#AAA', fontWeight: '500' },
+  buttonTextDisabled: { color: '#A1A1AA' },
+  footerHint: { textAlign: 'center', color: '#AAA', fontWeight: '500' },
 });
-
-export default SetupScreen;
