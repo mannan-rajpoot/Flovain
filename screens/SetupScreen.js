@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
 
   kicker: {
     fontWeight: '800',
-    color: '#8B5CF6',
+    color: '#000',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
     marginBottom: vs(6),
