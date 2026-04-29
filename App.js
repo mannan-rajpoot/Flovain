@@ -1,13 +1,17 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Animated, Dimensions, Platform, UIManager } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen';
 
 import IntroSplashScreen from './screens/IntroSplashScreen';
 import WelcomeScreen from './screens/WelcomeScreen';
 import SetupScreen from './screens/SetupScreen';
 import HomeScreen from './screens/HomeScreen';
+
+// Keep the native splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -22,6 +26,7 @@ export default function App() {
   const [screenStack, setScreenStack] = useState(['intro']);
   const [userData, setUserData] = useState(null);
   const [isFirstLaunch, setIsFirstLaunch] = useState(true);
+  const [appReady, setAppReady] = useState(false);
   const isAnimating = useRef(false);
 
   const positions = useRef({
@@ -31,9 +36,9 @@ export default function App() {
     home:    new Animated.Value(SCREEN_W),
   }).current;
 
-  // Check storage on boot
+  // Check storage on boot, then mark ready
   useEffect(() => {
-    const checkUser = async () => {
+    const prepare = async () => {
       try {
         const savedData = await AsyncStorage.getItem(STORAGE_KEY);
         if (savedData) {
@@ -41,11 +46,22 @@ export default function App() {
           setIsFirstLaunch(false);
         }
       } catch (e) {
-        console.log("Error loading data", e);
+        console.log('Error loading data', e);
+      } finally {
+        setAppReady(true);
       }
     };
-    checkUser();
+    prepare();
   }, []);
+
+  // Once the root view is laid out and appReady, hide the native splash.
+  // The native splash (pure white) fades out and your IntroSplashScreen
+  // is already underneath — zero flash, zero jump.
+  const onRootLayout = useCallback(async () => {
+    if (appReady) {
+      await SplashScreen.hideAsync();
+    }
+  }, [appReady]);
 
   const navigate = (toScreen, data) => {
     if (isAnimating.current) return;
@@ -82,7 +98,7 @@ export default function App() {
       setUserData(data);
       navigate('home');
     } catch (e) {
-      console.log("Error saving data", e);
+      console.log('Error saving data', e);
     }
   };
 
@@ -91,31 +107,37 @@ export default function App() {
       await AsyncStorage.clear();
       setUserData(null);
       setIsFirstLaunch(true);
-      // Reset animations and stack
       Object.keys(positions).forEach(key => {
         positions[key].setValue(key === 'intro' ? 0 : SCREEN_W);
       });
       setScreenStack(['intro']);
     } catch (e) {
-      console.log("Error clearing data", e);
+      console.log('Error clearing data', e);
     }
   };
 
+  // Don't render anything until AsyncStorage check is done.
+  // This prevents a white flicker before the IntroSplashScreen mounts.
+  if (!appReady) return null;
+
   const screens = {
-    intro: <IntroSplashScreen onFinish={() => navigate(isFirstLaunch ? 'welcome' : 'home')} />,
+    intro:   <IntroSplashScreen onFinish={() => navigate(isFirstLaunch ? 'welcome' : 'home')} />,
     welcome: <WelcomeScreen onGetStarted={() => navigate('setup')} />,
-    setup: <SetupScreen onFinish={handleSetupFinish} />,
-    home: <HomeScreen userData={userData} onLogout={clearAllData} />,
+    setup:   <SetupScreen onFinish={handleSetupFinish} />,
+    home:    <HomeScreen userData={userData} onLogout={clearAllData} />,
   };
 
   return (
     <SafeAreaProvider>
-      <View style={styles.root}>
+      <View style={styles.root} onLayout={onRootLayout}>
         <StatusBar style="dark" />
         {SCREEN_ORDER.map((name) => {
           if (!screenStack.includes(name)) return null;
           return (
-            <Animated.View key={name} style={[StyleSheet.absoluteFill, { transform: [{ translateX: positions[name] }] }]}>
+            <Animated.View
+              key={name}
+              style={[StyleSheet.absoluteFill, { transform: [{ translateX: positions[name] }] }]}
+            >
               {screens[name]}
             </Animated.View>
           );
