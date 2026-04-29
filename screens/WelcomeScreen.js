@@ -8,39 +8,23 @@ import {
   Dimensions,
   Image,
   ScrollView,
-  PixelRatio,
   Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Responsive helpers ──────────────────────────────────────────────────────
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
-
-// Scale relative to a 390-pt baseline (iPhone 14 logical width)
 const scale = (size) => (SCREEN_W / 390) * size;
-
-// Scale fonts with PixelRatio capping to avoid huge text on tablets
 const fs = (size) => {
   const scaled = scale(size);
   const maxScale = 1.25;
   return Math.min(scaled, size * maxScale);
 };
-
-// Vertical scale relative to a 844-pt baseline (iPhone 14 height)
 const vs = (size) => (SCREEN_H / 844) * size;
-
-// Clamp helper
 const clamp = (val, min, max) => Math.min(Math.max(val, min), max);
-// ─────────────────────────────────────────────────────────────────────────────
 
 const BAR_DATA = [40, 70, 45, 90, 65, 80, 95];
 
-/**
- * WelcomeScreen
- *
- * Props:
- *   onGetStarted — called when the user taps "Get Started"
- */
 const WelcomeScreen = ({ onGetStarted }) => {
   const insets = useSafeAreaInsets();
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -62,16 +46,12 @@ const WelcomeScreen = ({ onGetStarted }) => {
     ]).start();
   }, []);
 
-  // Dynamic bar height scaled to available card space
   const barAreaH = clamp(vs(100), 70, 130);
   const barW = Math.floor((SCREEN_W - scale(140)) / BAR_DATA.length);
-
-  // Footer height so ScrollView padding is always correct
   const footerH = clamp(vs(130), 110, 160) + insets.bottom;
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-
       {/* BACKGROUND DECORATION */}
       <View
         style={[
@@ -113,7 +93,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
             The Art of Consistency
           </Text>
           <Text style={[styles.title, { fontSize: fs(40), lineHeight: fs(46) }]}>
-           Build habits that change your life.
+            Build habits that change your life.
           </Text>
           <Text style={[styles.subtitle, { fontSize: fs(16), lineHeight: fs(25) }]}>
             Small habits create powerful results.
@@ -125,7 +105,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
         <Animated.View style={[styles.visualContainer, { opacity: fadeAnim, marginTop: vs(36) }]}>
           <View style={[styles.visualCard, { padding: scale(20), borderRadius: scale(24) }]}>
             <Text style={[styles.visualLabel, { fontSize: fs(12) }]}>
-              Weekly Growth
+              Track Your Growth
             </Text>
             <View style={[styles.barContainer, { height: barAreaH }]}>
               {BAR_DATA.map((h, i) => {
@@ -139,7 +119,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
                         height: barH,
                         width: barW,
                         borderRadius: scale(6),
-                        backgroundColor: i === BAR_DATA.length - 1 ? '#302f31' : '#E5E7EB',
+                        backgroundColor: i === BAR_DATA.length - 1 ? '#000' : '#E5E7EB',
                       },
                     ]}
                   />
@@ -208,7 +188,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#000',
     letterSpacing: -0.5,
-    right: 5
   },
   kicker: {
     fontWeight: '800',
@@ -231,9 +210,15 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   visualCard: {
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#FFF',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: '#F3F4F6',
+    // Card Shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
   visualLabel: {
     fontWeight: '700',
@@ -245,35 +230,31 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
   },
-  bar: {
-    // width/height/borderRadius/backgroundColor set inline for responsiveness
-  },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255,255,255,0.97)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: -4 },
-      },
-      android: {
-        elevation: 8,
-      },
-    }),
+    backgroundColor: 'rgba(255,255,255,0.98)',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    // Top bleed shadow for footer
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.03,
+    shadowRadius: 20,
+    elevation: 15,
   },
   primaryButton: {
     backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
+    // Button lift shadow
     shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
+    elevation: 8,
   },
   buttonText: {
     color: '#FFF',
