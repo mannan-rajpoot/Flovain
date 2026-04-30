@@ -52,7 +52,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* BACKGROUND DECORATION */}
+      {/* BACKGROUND DECORATION - No Shadow */}
       <View
         style={[
           styles.bgCircle,
@@ -101,9 +101,9 @@ const WelcomeScreen = ({ onGetStarted }) => {
           </Text>
         </Animated.View>
 
-        {/* PROGRESS VISUAL */}
+        {/* PROGRESS VISUAL - No Shadow */}
         <Animated.View style={[styles.visualContainer, { opacity: fadeAnim, marginTop: vs(36) }]}>
-          <View style={[styles.visualCard, { padding: scale(20), borderRadius: scale(24) }]}>
+          <View style={styles.visualCard}>
             <Text style={[styles.visualLabel, { fontSize: fs(12) }]}>
               Track Your Growth
             </Text>
@@ -130,7 +130,7 @@ const WelcomeScreen = ({ onGetStarted }) => {
         </Animated.View>
       </ScrollView>
 
-      {/* FIXED FOOTER ACTION */}
+      {/* FIXED FOOTER ACTION - No Shadow */}
       <Animated.View
         style={[
           styles.footer,
@@ -213,12 +213,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderWidth: 1,
     borderColor: '#F3F4F6',
-    // Card Shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+    padding: scale(20),
+    borderRadius: scale(24),
   },
   visualLabel: {
     fontWeight: '700',
@@ -230,6 +226,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
   },
+  bar: {
+    // No shadow
+  },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -238,23 +237,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.98)',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    // Top bleed shadow for footer
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.03,
-    shadowRadius: 20,
-    elevation: 15,
   },
   primaryButton: {
     backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
-    // Button lift shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 8,
   },
   buttonText: {
     color: '#FFF',
